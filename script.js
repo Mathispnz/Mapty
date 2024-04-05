@@ -12,6 +12,7 @@ class Workout {
     // Class fields
     date = new Date();
     id = (Date.now() + '').slice(-10);
+    clicks = 0;
 
     constructor(coords, distance, duration) {
         this.coords = coords; // [lat, lng]
@@ -23,6 +24,10 @@ class Workout {
         const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
         this.description = `${this.type[0].toUpperCase()}${this.type.slice(1)} on ${months[this.date.getMonth()]} ${this.date.getDate()}`
+    }
+
+    click() {
+        this.clicks++;
     }
 }
 
@@ -69,12 +74,18 @@ class App {
 
     // The constructor is called immediately right when the object is created
     constructor() {
+        // Get user's position
         this.#getPosition();
 
+        // Get data from localStorage
+        this.#getLocalStorage();
+
+        // Attach event handlers
         // In event listeners, the this keyword points to the DOM event on which it is attached (form in this case)
         // This can be fixed thanks to the bind method
         form.addEventListener('submit', this.#newWorkout.bind(this));  
         inputType.addEventListener('change', this.#toggleElevationField);
+        containerWorkouts.addEventListener('click', this.#moveToPopup.bind(this));
     }
 
     #getPosition() {
@@ -86,7 +97,6 @@ class App {
 
     #loadMap(position) {
         const {latitude, longitude} = position.coords;
-        console.log(`https://www.google.com/maps/@${latitude}.${longitude}`);
     
         this.#map = L.map('map').setView([latitude, longitude], 13);
     
@@ -96,6 +106,10 @@ class App {
 
         // Handling clicks on map
         this.#map.on('click', this.#showForm.bind(this));
+
+        this.#workouts.forEach(work => {
+            this.#renderWorkoutMarker(work);
+        })
     }
 
     #showForm(mapE) {
@@ -158,7 +172,6 @@ class App {
 
         // Add new object to workout array
         this.#workouts.push(workout);
-        console.log(workout);
 
         // Render workout on map as marker
         this.#renderWorkoutMarker(workout, lat, lng);
@@ -168,6 +181,9 @@ class App {
 
         // Hide form + clear input fields
         this.#hideForm();
+
+        // Set local storage to all workouts
+        this.#setLocalStorage();
     }
 
     #renderWorkoutMarker(workout) {
@@ -232,6 +248,48 @@ class App {
         }
 
         form.insertAdjacentHTML('afterend', html);
+    }
+
+    #moveToPopup(e) {
+        const workoutEl = e.target.closest('.workout');
+
+        if (!workoutEl) return;
+
+        const workout = this.#workouts.find(
+            work => work.id === workoutEl.dataset.id
+        );
+
+        this.#map.setView(workout.coords, 13, {
+            animate: true,
+            pan: {
+                duration: 1
+            }
+        });
+
+        // Use the public interface
+        // workout.click();
+    }
+
+    #setLocalStorage() {
+        // localStorage is blocking
+        localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+    }
+
+    #getLocalStorage() {
+        const data = JSON.parse(localStorage.getItem('workouts'));
+
+        if (!data) return;
+
+        this.#workouts = data;
+
+        this.#workouts.forEach(work => {
+            this.#renderWorkout(work);
+        });
+    }
+
+    reset() {
+        localStorage.removeItem('workouts');
+        location.reload();
     }
 }
 
